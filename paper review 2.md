@@ -1,4 +1,6 @@
 ###论文综述
+- Redundant software (and hardware) ensured Curiosity reached its destination and functioned as its designers intended.
+- The Scalable Commutativity Rule: Designing Scalable Software for Multicore Processors)
 
 目前开发者开发了很多软件和硬件，按照目的和用途软件的代码或者硬件做的也不一样，有时候为了达到目的开发者不仅开发软件和硬件，而且考虑如何优化其开发的软件和硬件。
 
