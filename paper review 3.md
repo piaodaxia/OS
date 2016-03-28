@@ -1,0 +1,14 @@
+###论文综述
+
+- Non-scalable locks are dangerous
+- Scalable Address Spaces Using RCU Balanced Trees
+
+传统的网络应用软件中，TCP建立连接之后，一般进行长时间的数据交互，因此，传统TCP协议栈中以TCB、VFS等metadata方式管理连接的设计并不会产生太多的扩展性问题。但是对于以短消息为特点的Social Media来说，其TCP连接都属于Short-lived connection，如一个Social Media中一个tcp连接典型过程只涉及600字节请求和1200字节响应两个报文，用传统协议栈的metadata管理方式的话会产生严重的Contention，可以导致随着cpu核数的增加性能反而下降的现象。
+对于传统协议栈来说，其TCB管理连接的方式中存在不一定在同一个cpu核上接收数据包和处理发送数据包的问题，是connection locality，即VFS对socket的管理存在inode、dentry等共享状态的同步问题。
+文中Fastsocket采用的方法主要有三种，第一是对TCB中的全局数据结构进行分割，每一个CPU Core设置一个per-core listen table和per-core established table。第二是当接收到一个数据包时，利用Recive Flow Deliver将数据包发送到对应的CPU核，即最大化实现connection locality，减少CPU Cache boucing现象，其中采用了将cpu core id哈希到源端口上的办法。第三是针对VFS中的调用路径进行优化，避免lock-intersive的接口，如随着socket创建销毁而进行的inode/dentry的初始化和析构；同时保持兼容性,对dentry和inode等磁盘文件所用结构体进行裁剪，只保持/proc文件系统相功能。
+
+经过测试，在24核机器中，针对短连接，Fastsocket比Linux标准协议栈提速20.4倍，对于Nginx和HAProxy，性能提高了267%和621%。
+
+扩展性锁机制在多核竞态时可以导致系统性能的下降，通过修改代码，避免出现serialization，就可以避免锁机制的使用，但是对于内核的复杂度来说，消除所有可能导致Contention的瓶颈点几乎不可能。
+因此，当前的Linux系统中存在这扩展性锁机制。但是，spin lock这种非扩展性锁机制在N个处理器环境下，一个处理器进行unlock释放该锁，将导致其余所有等待处理器的cache被invalidate，同时开始读取该spin lock，因为进行serialization读取，需要几百个周期的延迟，其penality到与CPU核数成正比，复杂度O(N)。
+文中分析了非扩展性锁机制，并与扩展性锁机制进行了对比，其中主要贡献是，第一，利用FOPS/MEMPOP/PFIND/EXIM四种benchmark，对锁机制在Linux下进行性能评估，证明了即使如只包含较短代码段的spin lock，虽然关键代码段很短，但是依然容易造成在多核下的性能衰减，随着cpu核数的增加，锁机制的代价迅速增加。第二，基于硬件缓存一致性协议，建立了一个基于Markov链的评估模型，解释了非扩展性锁机制在系统运行中的具体表现。
